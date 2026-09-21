@@ -1,0 +1,29 @@
+{
+  "name": "World of Zoo Performance Fix",
+  "version": "v2",
+  "status": "current reference build selected after local testing",
+  "binary": {
+    "filename": "d3d9.dll",
+    "size": 213504,
+    "sha256": "9bb09d0ca77b6259d8785323bdadfe556d925602837ec4a7439bd9e1c9eaf565",
+    "architecture": "x86 PE32"
+  },
+  "supported_original_exe_sha256": "622cd4914c4f85f8af949100746078be6a6c111303758cc74206f210e813bfc3",
+  "compiler": "Zig 0.15.2, x86-windows-gnu, -O2",
+  "native_frame_limiter_ms": 33,
+  "validated_code_signatures": 9,
+  "patch_rvas": [
+    "0x3087e6",
+    "0x4334b5",
+    "0x30ff68",
+    "0x30ff77"
+  ],
+  "validation": {
+    "ui_detour": "pass; 10000 repeated calls plus guard, stack and argument checks",
+    "original_mesh_constructor": "pass; 10000 constructions plus dynamic branch and mismatch checks",
+    "windows_d3d_forwarding": "pass; original Windows object and vtable retained",
+    "installed_v2": "reference checksum matches; log confirms both patches and successful Direct3D creation",
+    "standalone_gpu_test": "unavailable in restricted development environment; CreateDevice returned 0x8876086C",
+    "performance_claim": "No universal FPS gain or frame-time benchmark is claimed."
+  }
+}

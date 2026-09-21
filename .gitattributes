@@ -1,0 +1,7 @@
+* text=auto
+*.c text eol=lf
+*.def text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.zip binary
