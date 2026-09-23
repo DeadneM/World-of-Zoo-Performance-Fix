@@ -1,29 +1,41 @@
 {
   "name": "World of Zoo Performance Fix",
-  "version": "v2",
-  "status": "current reference build selected after local testing",
+  "version": "v4",
+  "status": "current release accepted after local gameplay testing",
+  "accepted_date": "2026-09-22",
   "binary": {
     "filename": "d3d9.dll",
-    "size": 213504,
-    "sha256": "9bb09d0ca77b6259d8785323bdadfe556d925602837ec4a7439bd9e1c9eaf565",
-    "architecture": "x86 PE32"
+    "size": 218624,
+    "sha256": "171d0c13914635db7f3d16088399ad22888090a5e0d340c0738c9ef8d4558fc5",
+    "architecture": "x86 PE32",
+    "preserved_log_banner": "World of Zoo Performance Fix V4 experimental"
   },
   "supported_original_exe_sha256": "622cd4914c4f85f8af949100746078be6a6c111303758cc74206f210e813bfc3",
   "compiler": "Zig 0.15.2, x86-windows-gnu, -O2",
+  "default_target_fps": 60,
+  "validated_gameplay_target_fps": 60,
+  "native_limiter_option": 0,
   "native_frame_limiter_ms": 33,
-  "validated_code_signatures": 9,
+  "validated_code_signatures": 19,
   "patch_rvas": [
     "0x3087e6",
     "0x4334b5",
     "0x30ff68",
-    "0x30ff77"
+    "0x30ff77",
+    "0x30fe80",
+    "0xda40",
+    "0x3df807"
   ],
   "validation": {
-    "ui_detour": "pass; 10000 repeated calls plus guard, stack and argument checks",
-    "original_mesh_constructor": "pass; 10000 constructions plus dynamic branch and mismatch checks",
-    "windows_d3d_forwarding": "pass; original Windows object and vtable retained",
-    "installed_v2": "reference checksum matches; log confirms both patches and successful Direct3D creation",
-    "standalone_gpu_test": "unavailable in restricted development environment; CreateDevice returned 0x8876086C",
-    "performance_claim": "No universal FPS gain or frame-time benchmark is claimed."
-  }
+    "native_physics_call_duration": "pass with mocked world integration endpoint",
+    "v2_buffers": "pass",
+    "guarded_readonly": "pass",
+    "pacing_and_abi": "pass",
+    "initialization_scenarios": 9,
+    "windows_d3d_forwarding": "pass",
+    "installed_v4": "checksum and application log verified",
+    "local_gameplay": "accepted by maintainer after V2/V4 captures; V4 mostly 59-60 FPS, V2 approximately 30 FPS",
+    "limits": "Different actions prevent a reliable speed ratio for every animation; not a universal performance guarantee"
+  },
+  "rollback_v2_sha256": "9bb09d0ca77b6259d8785323bdadfe556d925602837ec4a7439bd9e1c9eaf565"
 }

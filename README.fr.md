@@ -1,41 +1,56 @@
-# Correctif de performances pour World of Zoo
+# World of Zoo Performance Fix — V4
 
-Correctif Windows pour **World of Zoo sur Steam, en 32 bits**. Il vise les attentes Direct3D 9 observées dans les menus et lors des accès aux données 3D. **La limite native d'environ 30 FPS est conservée.**
+**La V4 est la version retenue après les essais locaux à 60 FPS.** Elle conserve les corrections de tampons de la V2, améliore certaines lectures de maillages et corrige un pas de temps physique resté fixe dans la V3.
 
-**Version de référence actuelle : V2**, retenue après les essais locaux. Elle inclut la correction des menus de la V1. Le résultat peut varier selon le pilote et la scène ; aucun gain chiffré universel n'est annoncé.
-
-[Télécharger la V2](dist/World-of-Zoo-Performance-Fix-v2.zip) · [English](README.md)
+[Télécharger la V4](https://github.com/DeadneM/World-of-Zoo-Performance-Fix/releases/tag/v4) · [Version V2 à cadence native](https://github.com/DeadneM/World-of-Zoo-Performance-Fix/releases/tag/v2) · [English](README.md)
 
 ## Installation
 
-1. Fermer le jeu et extraire l'archive ZIP.
+1. Fermer le jeu et extraire **World-of-Zoo-Performance-Fix-v4.zip**.
 2. Ouvrir le dossier contenant `WoZRetail.exe` : Steam → Propriétés → Fichiers installés → Parcourir.
-3. Conserver une copie de l'éventuelle `d3d9.dll` actuelle hors du dossier du jeu. Pour notre ancienne V1, la renommer en `d3d9-WoZIndexFix-V1.disabled` convient aussi.
-4. Copier **uniquement la nouvelle `d3d9.dll`** à côté de `WoZRetail.exe`.
-5. Relancer le jeu depuis Steam.
+3. Conserver une copie de toute ancienne `d3d9.dll` hors du dossier du jeu.
+4. Copier **`d3d9.dll` et `WoZPerformanceFix.ini`**, à la racine de l'archive, à côté de `WoZRetail.exe`.
+5. Relancer normalement le jeu par Steam.
 
-Une seule DLL locale peut porter le nom `d3d9.dll` : conserver tout autre correctif déjà présent avant de le remplacer.
+La cible est déjà réglée à **60 FPS**. Si la V3 ou la V4 d'essai est installée avec `TargetFPS=60` et `ReadOnlyMeshQueries=1`, l'INI existant reste compatible. La DLL publiée est exactement celle de la V4 essayée en jeu.
 
-Dans la dernière session de `WoZIndexFix.log`, vérifier le titre `WoZ Index and Mesh Fix V2`, les deux lignes `APPLIED` concernant les menus et les maillages, puis `Original Windows Direct3DCreate9: OK`.
+## Ce que fait la V4
 
-## Retour en arrière
+- Conserve les corrections V2 des tampons de l'interface et des maillages relus par le processeur.
+- Utilise des accès en lecture seule pour les requêtes de triangles dont le chemin est vérifié.
+- Remplace l'attente native d'environ 33 ms par un limiteur précis à 60 FPS.
+- Fournit au chemin physique identifié la durée réelle de l'image au lieu d'une durée fixe de 1/30 de seconde.
 
-Fermer le jeu, retirer la DLL ajoutée et restaurer la précédente si nécessaire. Restaurer la sauvegarde V1 sous le nom `d3d9.dll` permet de garder seulement la correction des menus.
+La correction physique et le nouveau limiteur sont installés ensemble ; si une vérification échoue, les deux restent d'origine. Le fichier `WoZRetail.exe` sur disque reste intact.
 
-Le correctif agit en mémoire au lancement. Il conserve l'EXE sur disque, les sauvegardes, la vitesse de simulation et la limite native de 33 ms.
+## Validation
 
-## Principe et validation
+Les captures locales montrent généralement 59–60 FPS avec la V4 et environ 30 FPS avec la V2. La V4 a été acceptée pour publication après cette comparaison le 22 septembre 2026.
 
-La V1 corrige la réécriture des indices de l'interface. La V2 utilise en plus le stockage géré déjà présent dans le moteur pour les maillages que le processeur relit et modifie. Cela conserve leurs données pour les mises à jour et les calculs sur les triangles.
+Les tests sur les instructions du moteur vérifient le pas physique, les tampons, le limiteur, les registres préservés, les refus d'initialisation et la transmission à Direct3D Windows. Le test physique mesure la durée fournie à une fonction de test remplaçant l'intégration finale ; il ne reproduit pas une partie complète.
 
-Neuf signatures du code sont contrôlées. Les tests du code 32 bits et du relais Direct3D passent, avec 10 000 appels du chemin des menus et 10 000 constructions des tampons 3D. Le journal de la V2 installée confirme l'application des deux corrections. Les performances sur d'autres configurations restent à tester.
+Les deux captures contiennent des actions différentes : elles ne permettent pas de garantir la même durée pour chaque animation. La correction ne rend pas automatiquement indépendants des FPS tous les compteurs qui ajoutent une valeur fixe par image. Les essais de jeu de cette version concernent **60 FPS**.
 
-Le test graphique séparé n'a pas pu créer d'appareil dans l'environnement de développement ; il ne constitue donc pas une mesure de gain. Les détails sont dans [les notes techniques](docs/TECHNICAL.md).
+## Revenir au mode natif ou à la V2
 
-Empreinte SHA-256 de la DLL V2 de référence :
+Pour conserver le limiteur et le pas physique natifs, mettre `TargetFPS=0` dans l'INI puis relancer. Cette option signifie environ 30 FPS, pas une cadence illimitée. `ReadOnlyMeshQueries=0` rétablit également les verrous de la V2.
+
+Pour retrouver exactement la V2 publiée, fermer le jeu et remplacer la DLL par **`Retour-V2/d3d9.dll`**, fourni dans l'archive. La V2 ignore cet INI.
+
+## Journal et compatibilité
+
+La dernière session de `WoZPerformanceFix.log` doit indiquer `APPLIED V4: target 60 FPS` et `Physics step uses actual frame delta`. La DLL conservée porte encore la mention **V4 experimental** dans son journal : c'est bien le binaire accepté après essai.
+
+Version Steam 32 bits analysée, empreinte SHA-256 de `WoZRetail.exe` :
 
 ```text
-9bb09d0ca77b6259d8785323bdadfe556d925602837ec4a7439bd9e1c9eaf565
+622cd4914c4f85f8af949100746078be6a6c111303758cc74206f210e813bfc3
 ```
 
-Les sources, [les instructions de compilation](BUILDING.md) et les tests sont fournis. Aucun exécutable ou fichier de données du jeu n'est inclus.
+Empreinte de la DLL V4, 218624 octets :
+
+```text
+171d0c13914635db7f3d16088399ad22888090a5e0d340c0738c9ef8d4558fc5
+```
+
+Les sources et les tests sont fournis. Aucun exécutable du jeu, sauvegarde ou capture privée n'est inclus. [Compilation](BUILDING.md) · [Détails techniques](docs/TECHNICAL.md).

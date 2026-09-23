@@ -13,7 +13,7 @@
    Change that one caller's dynamic-buffer lock to engine mode 1, which
    RALIndexBufferD3D::lock translates to D3DLOCK_DISCARD (0x2000).
 
-   No COM object/vtable changes. No timer or FPS-limit changes. A six-byte
+   Inherited V2 buffer fix: no COM object/vtable changes. A six-byte
    detour in the already unpacked in-memory EXE preserves the original
    upload, memcpy, unlock and bind code. Static buffers and other callers
    keep mode zero. The EXE on disk is untouched.
@@ -27,6 +27,15 @@
    (writeOnly=false). Other dynamic allocations retain their old branch.
    Direct3D maintains the system-memory copy and uploads changes. This
    trades an extra CPU copy for removal of GPU readback on these locks.
+
+   V3 experimental: see woz_experimental_v3.h for guarded read-only
+   triangle queries and optional QPC frame pacing. Simulation clocks
+   are not modified. TargetFPS=0 retains the native 33 ms limiter.
+
+   V4: woz_physics_v4.h corrects the per-frame physics step. V3's
+   60 FPS mode was reported smooth but accelerated gameplay because
+   the world was still integrated by a fixed 1/30 second each frame.
+   The new limiter and physics change are installed together, or neither.
 */
 static const BYTE original_site[6]={0x6a,0x00,0x8b,0xf1,0x8b,0x06};
 
@@ -100,11 +109,16 @@ static BOOL install_mesh_fix(BYTE *factory,BYTE *constructor){
     return TRUE;
 }
 
+#define WOZ_TIMING_V4
+#include "woz_experimental_v3.h"
+#include "woz_physics_v4.h"
+
 #ifndef WOZ_TEST
 static HMODULE self;
 static void *(WINAPI *real_create)(UINT);
 static INIT_ONCE once=INIT_ONCE_STATIC_INIT;
 static WCHAR logpath[MAX_PATH];
+static WCHAR inipath[MAX_PATH];
 
 static void logline(const char *text){
     HANDLE f=CreateFileW(logpath,FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
@@ -138,8 +152,11 @@ static BOOL CALLBACK initialize(PINIT_ONCE a,PVOID b,PVOID *c) {
     if(!n||n>=MAX_PATH)return TRUE;
     while(n&&path[n-1]!=L'\\')--n;
     if(n+32>=MAX_PATH)return TRUE;
-    path[n]=0;lstrcpyW(logpath,path);lstrcatW(logpath,L"WoZIndexFix.log");
-    logline("\r\nWoZ Index and Mesh Fix V2\r\n");
+    path[n]=0;lstrcpyW(logpath,path);lstrcatW(logpath,L"WoZPerformanceFix.log");
+    lstrcpyW(inipath,path);lstrcatW(inipath,L"WoZPerformanceFix.ini");
+    logline("\r\nWorld of Zoo Performance Fix V4 experimental\r\n");
+    unsigned target=valid_target(GetPrivateProfileIntW(L"Timing",L"TargetFPS",60,inipath));
+    BOOL readonly=GetPrivateProfileIntW(L"Buffers",L"ReadOnlyMeshQueries",1,inipath)!=0;
     n=GetSystemDirectoryW(path,MAX_PATH);
     if(!n||n+11>=MAX_PATH)return TRUE;
     lstrcatW(path,L"\\d3d9.dll");
@@ -155,11 +172,29 @@ static BOOL CALLBACK initialize(PINIT_ONCE a,PVOID b,PVOID *c) {
         logline("NOT APPLIED: module lifetime could not be secured\r\n");return TRUE;
     }
     if(install_detour(base+0x3087e6,(uintptr_t)(base+0x22c91b)))
-        logline("APPLIED: dynamic UI index uploads use DISCARD. Native 33 ms limiter unchanged. No Direct3D object/vtable hooks.\r\n");
+        logline("APPLIED V2: dynamic UI index uploads use DISCARD. No Direct3D object/vtable hooks.\r\n");
     else logline("NOT APPLIED: memory patch unavailable; original rendering retained\r\n");
-    if(install_mesh_fix(base+0x4334af,base+0x30ff5b))
-        logline("APPLIED: CPU-accessed meshes use readable MANAGED vertex/index buffers. Native mesh lock/unlock and 33 ms limiter unchanged.\r\n");
+    BOOL mesh_ok=install_mesh_fix(base+0x4334af,base+0x30ff5b);
+    if(mesh_ok)logline("APPLIED V2: CPU-accessed meshes use readable MANAGED vertex/index buffers.\r\n");
     else logline("MESH FIX NOT APPLIED: memory patch unavailable; mesh allocation retained\r\n");
+    const BYTE adapter[]={0x8b,0x44,0x24,0x08,0x8b,0x54,0x24,0x10,0xc7,0x00,0,0,0,0,0xc7,0x02,0,0,0,0,
+      0x8b,0x54,0x24,0x04,0x8b,0x89,0x88,0,0,0,0x8b,0x01,0x8b,0x40,0x0c,0x52,0x8b,0x54,0x24,0x10,0x52,0xff,0xd0,0xc2,0x10,0x00};
+    const BYTE query[]={0x8b,0x07,0x8b,0x40,0x48,0x8d,0x4f,0x2c,0x51,0x8d,0x54,0x24,0x18,0x52,0x8b,0xcf,0xff,0xd0,0x84,0xc0};
+    const BYTE read_mode[]={0xbe,0x10,0,0,0};
+    if(readonly&&mesh_ok&&
+       !memcmp(base+0x433080,adapter,sizeof(adapter))&&
+       !memcmp(base+0x433518,query,sizeof(query))&&
+       !memcmp(base+0x3084e8,read_mode,sizeof(read_mode))&&
+       !memcmp(base+0x308838,read_mode,sizeof(read_mode))&&
+       install_readonly_fix(base+0x30fe80,(uintptr_t)(base+0x4330ab),(uintptr_t)(base+0x43352a)))
+        logline("APPLIED V3: guarded CPU triangle queries use READONLY for managed VB+IB; update locks unchanged.\r\n");
+    else logline(readonly?"READONLY NOT APPLIED: prerequisite/signature/patch failed; V2 lock behavior retained.\r\n":"READONLY DISABLED in INI.\r\n");
+    if(target&&pacing_initialize(target)&&install_timing_v4(base,(uintptr_t)&pace_frame)){
+      char message[240];snprintf(message,sizeof(message),"APPLIED V4: target %u FPS, QPC pacing, %s. Physics step uses actual frame delta instead of fixed 1/30. Gameplay validation required.\r\n",target,pacing_timer?"high-resolution waitable timer":"active-wait fallback");logline(message);
+    }else{
+      if(pacing_timer){CloseHandle(pacing_timer);pacing_timer=NULL;}
+      logline(target?"FPS/PHYSICS MODE NOT APPLIED: timer/signature/patch failed; native 33 ms limiter and physics step retained.\r\n":"FPS/PHYSICS MODE DISABLED: native 33 ms limiter and physics step retained (TargetFPS=0).\r\n");
+    }
     return TRUE;
 }
 

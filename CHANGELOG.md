@@ -1,6 +1,22 @@
 # Changelog
 
-## V2 — current reference build
+## V4 — 2026-09-22
+
+- Publish the exact V4 DLL accepted after local gameplay comparisons, targeting 60 FPS.
+- Retain V2's menu/mesh buffer fixes and V3's guarded READONLY triangle queries and QPC pacing.
+- Replace the identified fixed physics timestep with the native measured frame duration.
+- Install the pacing and physics patches together, with native fallback if either cannot be installed.
+- Include the default INI, sources, tests, checksums and the exact V2 DLL for rollback.
+
+The V4 DLL SHA-256 is `171d0c13914635db7f3d16088399ad22888090a5e0d340c0738c9ef8d4558fc5`. Its historical experimental log banner is retained to preserve the tested binary. Local acceptance does not claim exhaustive animation or hardware validation.
+
+## V3 — internal test build
+
+- Add guarded READONLY CPU triangle queries and configurable QPC pacing.
+- Local tests report smooth 60 FPS, with a concern about accelerated gameplay.
+- The native clock was correct, but the fixed physics-step path motivated V4.
+
+## V2 — native frame-cap reference
 
 - Preserve the targeted V1 menu index-buffer correction.
 - Use the engine's existing managed allocation branch for the observed CPU-accessed mesh factory.

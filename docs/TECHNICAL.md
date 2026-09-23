@@ -1,57 +1,39 @@
-# Technical notes — V2
+# Technical notes — V4
 
-Addresses below refer to the analyzed 32-bit Steam image at base `0x00400000`. The packaged DLL uses module-relative offsets and verifies expected code bytes before patching.
+Addresses refer to the analyzed Steam x86 image at base `0x00400000`. The proxy uses module-relative patch offsets and verifies expected instruction bytes. V2's original buffer investigation is preserved in [TECHNICAL-V2.md](TECHNICAL-V2.md).
 
-## UI index uploads
+## Inherited buffer changes
 
-The UI full-index upload returns to `0x0062C91B` and reaches the engine upload method at `0x007087E0`. The buffer is created with `D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY`, but the original upload locks offset zero with engine mode 0.
+The UI full-index upload at `0x7087E0` uses DISCARD only for the verified dynamic-buffer caller returning to `0x62C91B`. The mesh factory at `0x833470` selects the existing readable managed-buffer branch; retained contents remain available to deformation and CPU triangle queries.
 
-V1 replaces six bytes at RVA `0x3087E6` with a guarded detour. The specific UI caller and the buffer's dynamic flag must both match. Only then is engine mode 1 selected, which the original lock method translates to `D3DLOCK_DISCARD`. The original copy, unlock and bind remain in place.
+The paired lock at `0x70FE80` additionally selects engine mode 3 (READONLY) only when both return-address guards (`0x8330AB`, `0x83352A`) and readable managed VB/IB properties match. A copy of the original paired-lock routine supplies the normal path, and a second copy changes the two mode arguments for that read-only path. Updates and cleanup remain native. There are no COM object/vtable replacements.
 
-A pre-fix menu sample found 279 of 300 observations in a Windows wait, with the index-buffer lock chain present. This observation and the caller's full replacement semantics supported the targeted change. The menu improvement was then reported during testing.
+The earlier linear scan covered all executable sections but does not establish an exhaustive dynamic call graph. Buffers requiring retained contents must not receive a global DISCARD conversion. Existing DISCARD/NOOVERWRITE vertex-ring behavior remains in place.
 
-Microsoft describes why unflagged locks on buffers still in use can stall, and when DISCARD is appropriate: [D3D9 performance optimizations](https://learn.microsoft.com/en-us/windows/win32/direct3d9/performance-optimizations#using-dynamic-vertex-and-index-buffers).
+## Frame pacing
 
-## CPU-accessed meshes
+The native main-loop block at `0x40DA40–0x40DA6C` waits until 33 ms have elapsed. Optional pacing replaces its first seven bytes, preserving CPU registers, flags and x87/MMX/SSE state in the detour. QPC deadlines include work between frames; late frames reset the schedule without catch-up bursts. The implementation uses a high-resolution waitable timer when available, with a short final active wait. It preserves the native enable/inactive state checks.
 
-The gameplay sample with V1 exposed another path:
+The supplied target and the gameplay validation scope are 60 FPS. The inherited parser accepts integer targets from 30 to 360, but higher values have no gameplay validation. `TargetFPS=0` keeps the native limiter **and** native physics timestep. Neither the game graphics settings nor VSync are altered by this DLL.
 
-```text
-mesh update / triangle query
-  -> 0x00833080
-  -> 0x0070FE80
-  -> vertex-buffer lock (return 0x0070852A)
-     index-buffer lock  (return 0x0070887A)
-```
+## Physics duration
 
-The relevant callers are `0x008343C0` and `0x008334F0`. The latter leads to CPU reads of triangle indices and vertex positions. These accesses require preserved contents, so changing their locks to DISCARD would be incorrect.
+The native clock at `0x4EFE90` measures elapsed milliseconds, applies its time scale and clamps large frame deltas to 100 ms. This clock was already correct in V3.
 
-V2 changes three more bytes:
+The controller constructor at `0x7DF9F0` sets `[controller+0x20]` to 1/30 second. Its update at `0x7DF7F0` reads the clock delta, updates an accumulator and invokes the world-step path for a positive delta. The step at `0x7DF840` still loads `+0x20` before passing a float duration to `0x7FB060`.
 
-| RVA | Original | V2 | Purpose |
-| --- | --- | --- | --- |
-| `0x4334B5` | `00` | `01` | Select the existing managed branch for the observed mesh factory |
-| `0x30FF68` | `01` | `00` | Make managed vertex buffers in the paired-mesh class readable |
-| `0x30FF77` | `01` | `00` | Make managed index buffers in that class readable |
+V4 detours seven bytes at `0x7DF807` (RVA `0x3DF807`). A 15-byte stub inserts `FST dword [ESI+0x20]`, leaves ST(0) intact, reproduces the overwritten instructions and returns to `0x7DF80E`. The original step and its timestep getter at `0x7DF950` then read the measured frame duration. Zero-delta skipping, event dispatch and the existing clock clamp remain native.
 
-The general creation wrappers already pass `dynamic=false`. Together with `managed=true` and `writeOnly=false`, the managed branch creates buffers with usage 0 in `D3DPOOL_MANAGED`. Other callers requesting dynamic allocation still use the original dynamic branch.
+The limiter and physics detours form one installation transaction: validate both paths, prepare both stubs, then acquire write access to both sites before changing either. A refused second protection change restores the first protection and leaves both sites unmodified.
 
-Managed resources retain a system-memory copy which the CPU can access; Direct3D uploads changes as required. This trades an extra copy/upload for avoiding GPU-synchronized CPU access. It is a targeted compatibility choice, not a recommendation to convert all frequently updated geometry. Microsoft warns about the cost of managed resources for rapidly changing data. [D3DPOOL](https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dpool), [resource management](https://learn.microsoft.com/en-us/windows/win32/direct3d9/managing-resources), [D3DUSAGE](https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dusage).
+This changes one timestep source. Counters adding a fixed amount per frame are not automatically corrected, and not every animation consumer has been traced.
 
-## Limiter and scope
+## Evidence and limits
 
-The main loop waits until 33 ms have elapsed since the iteration started, including the work performed during that iteration. It uses QueryPerformanceCounter in an active loop. The fix does not alter the timer, limiter, simulation, presentation interval or graphics settings.
+The physics regression executes the original clock, accumulator, controller-update, step and getter instructions with mocked event endpoints and a mocked world-integration endpoint that adds received durations. With 600 updates distributed over 10 seconds, the original path supplies approximately 20 seconds and V4 supplies 10 seconds. Tests at 20, 30, 40, 50 and 60 updates/sec, plus 10,000 variable-duration updates, pass. The test verifies the call duration, not the full Havok world.
 
-In the sampled enclosure, 233 of 300 observations contained the active-limiter return. That does not rule out intermittent slow frames. Seventeen observations were in a Windows wait: nine in the mesh-lock path, seven in presentation and one in another render call. Stack candidates were checked against executable call sites; the sampler was not a complete stack unwinder or a frame-time benchmark.
+The V2 buffer regressions, guarded READONLY path, pacing/ABI tests and system Direct3D forwarding pass. Nine full-initialization scenarios include mismatched physics/update signatures and refusal to make the second site writable. Nineteen instruction signatures match the analyzed image; the DLL exports only `Direct3DCreate9`.
 
-## Verification
+Local captures showed mostly 59–60 FPS with V4 and approximately 30 FPS with V2. The maintainer accepted this exact V4 binary for publication on 22 September 2026. The recordings contain different actions and are not an objective frame-time benchmark or a matched timing test of every animation. Hardware/driver and scene coverage remain limited to the reported local tests.
 
-- Nine image signatures checked against the analysis copy.
-- PE32 x86 DLL with the `Direct3DCreate9` export.
-- Actual x86 detour executed with caller, dynamic/static, argument and stack checks; 10,000 repetitions.
-- Original mesh constructor executed on mock objects, checking both buffer sizes, flags, retained dynamic branch and mismatch refusal; 10,000 constructions.
-- Original Windows Direct3D object/vtable preserved by the proxy forwarding test.
-- Installed V2 binary matched the reference checksum; its log confirmed both patches and successful Direct3D creation.
-- Standalone graphics-device test unavailable in the restricted development environment: `CreateDevice` returned `0x8876086C` before any rendering. No GPU benchmark result is claimed from that test.
-
-The original game executable and raw process logs are not distributed. The optional constructor regression test needs a local analysis copy supplied by the developer.
+The packaged reference DLL retains its historical `V4 experimental` log banner. Its SHA-256 is `171d0c13914635db7f3d16088399ad22888090a5e0d340c0738c9ef8d4558fc5` (218624 bytes). The release does not silently rebuild that accepted binary.
