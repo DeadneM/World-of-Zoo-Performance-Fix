@@ -1,4 +1,4 @@
-/* The original frame update stores the measured frame delta in its
+/* V4 physics timing. The original frame update stores the measured frame delta in its
    accumulator, but always calls the world step with the constructor's
    1/30-second value at controller+0x20. At 60 updates per wall-clock
    second this advances the physics world by about two seconds.

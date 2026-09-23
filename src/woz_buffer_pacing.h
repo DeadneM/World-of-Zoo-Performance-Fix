@@ -1,5 +1,6 @@
-/* V3 experimental additions. The V2 fixes remain separate and unchanged.
-   No COM/vtable replacement, executable file edits, or simulation clock hooks. */
+/* Guarded mesh reads and frame pacing, introduced in V3 and retained in V4.
+   The production pacing detour is installed with physics by install_timing_v4.
+   The native elapsed-time clock and Direct3D objects remain unchanged. */
 static const BYTE pair_lock_signature[]={
   0x56,0x8b,0xf1,0x0f,0xb7,0x56,0x18,0x0f,0xaf,0x56,0x10,
   0x8b,0x4e,0x04,0x8b,0x01,0x8b,0x40,0x20,0x57,0x6a,0x00,
@@ -159,15 +160,3 @@ static BOOL limiter_matches(const BYTE *base,const BYTE *site){
   put32(expected+29,(uintptr_t)(base+0x6a10c0)); // relocated absolute data operand
   return !memcmp(site,expected,sizeof(expected));
 }
-#if !defined(WOZ_TIMING_V4) || defined(WOZ_TEST)
-static BOOL install_pacer(BYTE *base,BYTE *site,uintptr_t callback){
-  if(!limiter_matches(base,site))return FALSE;
-  BYTE *code=VirtualAlloc(NULL,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
-  if(!code)return FALSE;
-  size_t n=make_pacer_stub(code,(uintptr_t)code,callback,(uintptr_t)(site+sizeof(limiter_signature)));
-  if(!seal_code(code,n)||!patch_branch(site,7,code)){
-    VirtualFree(code,0,MEM_RELEASE);return FALSE;
-  }
-  return TRUE;
-}
-#endif

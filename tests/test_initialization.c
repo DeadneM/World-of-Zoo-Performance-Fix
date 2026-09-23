@@ -19,8 +19,12 @@ static HMODULE WINAPI fixture_module(LPCWSTR name){return name?GetModuleHandleW(
 #undef GetModuleHandleW
 #undef VirtualProtect
 int main(int argc,char **argv){
-  assert(argc==2||argc==3);
-  FILE *f=fopen(argc==3?argv[2]:"work/exe-analysis/WoZRetail.exe.unpacked.exe","rb");assert(f);
+  if(argc!=3){fprintf(stderr,"Usage: %s <case> <analysis-exe>\n",argv[0]);return 2;}
+  const char *cases[]={"on","native","invalid","mismatch","fps_mismatch","query_mismatch","physics_mismatch","step_mismatch","protect_failure"};
+  BOOL known=FALSE;
+  for(unsigned i=0;i<sizeof(cases)/sizeof(cases[0]);i++)if(!strcmp(argv[1],cases[i]))known=TRUE;
+  if(!known){fprintf(stderr,"Unknown initialization case: %s\n",argv[1]);return 2;}
+  FILE *f=fopen(argv[2],"rb");assert(f);
   assert(!fseek(f,0,SEEK_END));long size=ftell(f);assert(size>0);rewind(f);
   BYTE *file=malloc((size_t)size);assert(file);assert(fread(file,1,(size_t)size,f)==(size_t)size);fclose(f);
   IMAGE_NT_HEADERS32 *nt=(void*)(file+((IMAGE_DOS_HEADER*)file)->e_lfanew);

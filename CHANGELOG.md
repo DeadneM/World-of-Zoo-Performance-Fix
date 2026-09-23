@@ -1,6 +1,15 @@
 # Changelog
 
-## V4 — 2026-09-22
+## Repository maintenance — 2026-09-23
+
+- Rewrite the English and French guides from installation through troubleshooting, validation and implementation details.
+- Keep downloadable ZIPs in Releases instead of duplicating them in the source tree.
+- Consolidate the duplicate UI/mesh tests into `test_buffers.c`, retaining the optional native-constructor check.
+- Require explicit analysis-image paths in native tests and reject unknown initialization cases.
+- Give the active buffer/pacing and physics headers descriptive names; move the standalone pacing installer into its ABI test.
+- Preserve the V4 runtime logic, log strings and exact published binary. Published tags and release archives retain their original snapshots.
+
+## V4 — 2026-09-23 (accepted 2026-09-22)
 
 - Publish the exact V4 DLL accepted after local gameplay comparisons, targeting 60 FPS.
 - Retain V2's menu/mesh buffer fixes and V3's guarded READONLY triangle queries and QPC pacing.

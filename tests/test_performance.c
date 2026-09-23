@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <math.h>
 #define THISCALL __attribute__((thiscall))
-static const char *analysis_exe="work/exe-analysis/WoZRetail.exe.unpacked.exe";
+static const char *analysis_exe;
 static BYTE *allocate(void){BYTE *p=VirtualAlloc(NULL,8192,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE);assert(p);return p;}
 static void read_original(unsigned rva,void *out,size_t length){
   FILE *f=fopen(analysis_exe,"rb");assert(f);
@@ -132,6 +132,18 @@ static BYTE *emit_capture(BYTE *p,BYTE *state){
   for(unsigned i=0;i<8;i++){BYTE op[]={0x89,(BYTE)(0x05+i*8)};p=emit_abs(p,op,2,(uintptr_t)(state+4*i));}
   return p;
 }
+/* Test-only installation of the pacing stub in a synthetic code buffer.
+   The DLL always installs pacing and physics together. */
+static BOOL install_test_pacer(BYTE *base,BYTE *site,uintptr_t callback){
+  if(!limiter_matches(base,site))return FALSE;
+  BYTE *code=VirtualAlloc(NULL,4096,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
+  if(!code)return FALSE;
+  size_t n=make_pacer_stub(code,(uintptr_t)code,callback,(uintptr_t)(site+sizeof(limiter_signature)));
+  if(!seal_code(code,n)||!patch_branch(site,7,code)){
+    VirtualFree(code,0,MEM_RELEASE);return FALSE;
+  }
+  return TRUE;
+}
 static void test_pacer_abi(void){
   BYTE *code=allocate(),*p=code,*original_fx=code+2048,*before_fx=code+2560,*after_fx=code+3072;
   BYTE *before=code+3600,*after=code+3664,*game=code+3800,*site=code+512;
@@ -140,8 +152,8 @@ static void test_pacer_abi(void){
   // Rebase the one absolute operand in the copied native limiter.
   put32(site+29,(uintptr_t)(code+0x6a10c0));site[44]=0xc3;
   BYTE bad[sizeof(limiter_signature)];memcpy(bad,site,sizeof(bad));bad[0]^=1;
-  assert(!install_pacer(code,bad,(uintptr_t)clobber_callback));
-  assert(install_pacer(code,site,(uintptr_t)clobber_callback));
+  assert(!install_test_pacer(code,bad,(uintptr_t)clobber_callback));
+  assert(install_test_pacer(code,site,(uintptr_t)clobber_callback));
   *p++=0x9c;*p++=0x60;
   const BYTE save[]={0x0f,0xae,0x05},restore[]={0x0f,0xae,0x0d};
   p=emit_abs(p,save,3,(uintptr_t)original_fx);
@@ -182,4 +194,8 @@ static void test_real_pacing(void){
     if(pacing_timer){CloseHandle(pacing_timer);pacing_timer=NULL;}
   }
 }
-int main(int argc,char **argv){if(argc>1)analysis_exe=argv[1];test_deadlines();test_native_clock();test_readonly();test_pacer_abi();test_real_pacing();return 0;}
+int main(int argc,char **argv){
+  if(argc!=2){fprintf(stderr,"Usage: %s <analysis-exe>\n",argv[0]);return 2;}
+  analysis_exe=argv[1];
+  test_deadlines();test_native_clock();test_readonly();test_pacer_abi();test_real_pacing();return 0;
+}

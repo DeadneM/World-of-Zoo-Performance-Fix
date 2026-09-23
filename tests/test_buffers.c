@@ -20,6 +20,7 @@ static BYTE *caller(BYTE *p, BYTE *upload){
 static void test_mesh(void);
 static const char *analysis_image;
 int main(int argc,char **argv){
+    if(argc>2){fprintf(stderr,"Usage: %s [analysis-exe]\n",argv[0]);return 2;}
     analysis_image=argc>1?argv[1]:NULL;
     BYTE *code=VirtualAlloc(NULL,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE);assert(code);
     const BYTE original[]={0x56,0x57,0x8b,0x7c,0x24,0x10,0x6a,0x00,0x8b,0xf1,0x8b,0x06,0x8b,0x50,0x24,0x57,0x6a,0x00,0xff,0xd2,0x5f,0x5e,0xc2,0x08,0x00};

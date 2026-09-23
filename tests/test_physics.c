@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <math.h>
 #define THISCALL __attribute__((thiscall))
-static const char *analysis_exe="work/exe-analysis/WoZRetail.exe.unpacked.exe";
+static const char *analysis_exe;
 static void load_code(unsigned rva,BYTE *out,size_t n){
   FILE *f=fopen(analysis_exe,"rb");assert(f);assert(!fseek(f,(long)rva,SEEK_SET));assert(fread(out,1,n,f)==n);fclose(f);
 }
@@ -66,7 +66,8 @@ static double run(unsigned fps,unsigned seconds){
   assert(world_calls==fps*seconds&&events==world_calls);return world_seconds;
 }
 int main(int argc,char **argv){
-  if(argc>1)analysis_exe=argv[1];setup();
+  if(argc!=2){fprintf(stderr,"Usage: %s <analysis-exe>\n",argv[0]);return 2;}
+  analysis_exe=argv[1];setup();
   double old30=run(30,10),old60=run(60,10);
   printf("REPRODUCED: 10 wall-clock seconds -> native world %.6f s at 30 FPS; %.6f s at 60 FPS.\n",old30,old60);
   assert(fabs(old30-10.0)<0.0001&&fabs(old60-20.0)<0.0001);

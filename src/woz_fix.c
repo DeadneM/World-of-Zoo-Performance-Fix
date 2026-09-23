@@ -28,11 +28,11 @@
    Direct3D maintains the system-memory copy and uploads changes. This
    trades an extra CPU copy for removal of GPU readback on these locks.
 
-   V3 experimental: see woz_experimental_v3.h for guarded read-only
-   triangle queries and optional QPC frame pacing. Simulation clocks
-   are not modified. TargetFPS=0 retains the native 33 ms limiter.
+   woz_buffer_pacing.h contains the guarded read-only triangle queries
+   and QPC frame pacing introduced in V3. The native elapsed-time clock
+   is unchanged. TargetFPS=0 retains the native limiter and physics step.
 
-   V4: woz_physics_v4.h corrects the per-frame physics step. V3's
+   V4: woz_physics.h corrects the per-frame physics step. V3's
    60 FPS mode was reported smooth but accelerated gameplay because
    the world was still integrated by a fixed 1/30 second each frame.
    The new limiter and physics change are installed together, or neither.
@@ -109,9 +109,8 @@ static BOOL install_mesh_fix(BYTE *factory,BYTE *constructor){
     return TRUE;
 }
 
-#define WOZ_TIMING_V4
-#include "woz_experimental_v3.h"
-#include "woz_physics_v4.h"
+#include "woz_buffer_pacing.h"
+#include "woz_physics.h"
 
 #ifndef WOZ_TEST
 static HMODULE self;

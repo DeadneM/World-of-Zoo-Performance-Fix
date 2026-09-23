@@ -1,6 +1,8 @@
 /build/
+/dist/
 /.zig-cache/
 /zig-out/
+__pycache__/
 *.pdb
 *.lib
 *.obj
@@ -8,3 +10,5 @@
 *.exe
 *.dll
 *.unpacked.*
+*.dmp
+*.bak

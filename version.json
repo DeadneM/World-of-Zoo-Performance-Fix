@@ -3,6 +3,13 @@
   "version": "v4",
   "status": "current release accepted after local gameplay testing",
   "accepted_date": "2026-09-22",
+  "published_date": "2026-09-23",
+  "release_url": "https://github.com/DeadneM/World-of-Zoo-Performance-Fix/releases/tag/v4",
+  "archive": {
+    "filename": "World-of-Zoo-Performance-Fix-v4.zip",
+    "size": 248142,
+    "sha256": "b843a98304021771914cb1d07bf6a763f6722380d07addf2a10bb2a5af62a9f5"
+  },
   "binary": {
     "filename": "d3d9.dll",
     "size": 218624,
