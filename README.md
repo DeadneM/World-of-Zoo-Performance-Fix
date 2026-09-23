@@ -2,6 +2,10 @@
 
 # World of Zoo Performance Fix
 
+<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3806665895">
+  <img src="docs/images/Image%20Codex%2023%20sept.%202026%2C%2012_21_15.png" alt="World of Zoo Performance Fix installation guide">
+</a>
+
 **Smoother menus, fewer buffer stalls, and a 60 FPS mode with corrected physics timing.**
 
 World of Zoo · Steam · Windows · Direct3D 9 · 32-bit
